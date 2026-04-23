@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:maps.openrouteservice.org)",
+      "WebFetch(domain:openrouteservice.org)",
+      "WebFetch(domain:api.openrouteservice.org)",
+      "WebFetch(domain:github.com)"
+    ]
+  }
+}
