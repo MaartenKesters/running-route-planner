@@ -1,0 +1,14 @@
+[project]
+name = "running-route-planner"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "folium>=0.20.0",
+    "gpxpy>=1.6.2",
+    "openai>=2.32.0",
+    "requests>=2.33.1",
+    "streamlit>=1.56.0",
+    "streamlit-folium>=0.27.1",
+]
