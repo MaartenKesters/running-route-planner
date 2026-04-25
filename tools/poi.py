@@ -34,8 +34,8 @@ def _interest_score(tags: dict) -> int:
     if "website" in tags:     score += 1
     if "description" in tags: score += 1
     # Prefer specific high-value tourism/historic values
-    high_value = {"museum", "castle", "monument", "ruins", "archaeological_site",
-                  "theatre", "viewpoint", "attraction", "nature_reserve"}
+    high_value = {"castle", "monument", "ruins",
+                  "viewpoint", "nature_reserve"}
     for key in ("tourism", "historic", "amenity", "leisure"):
         if tags.get(key) in high_value:
             score += 2
@@ -110,8 +110,6 @@ def get_pois(lat: float, lon: float, radius_m: int, route_type: str) -> list[dic
             "_score": _interest_score(tags),
         })
 
-    # Return the 25 most interesting POIs, score descending
+    # Return the 10 most interesting POIs, score descending
     candidates.sort(key=lambda p: p["_score"], reverse=True)
-    for c in candidates[:10]:
-        del c["_score"]
     return candidates[:10]

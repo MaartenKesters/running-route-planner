@@ -1,16 +1,16 @@
 import math
 import os
+import random
 
 import folium
 import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_folium import st_folium
 
-from agent import auto_select_waypoints, describe_route, estimate_loop_km, translate_poi_names
+from agent import plan_route, describe_route, estimate_loop_km, translate_poi_names
 from tools.export import to_gpx
 from tools.geocoding import geocode
 from tools.poi import get_pois
-from tools.routing import get_route
 
 
 def _load_secrets():
@@ -113,6 +113,36 @@ def _build_map(
     return m
 
 
+_SPINNER_MSGS = [
+    "Plotting your adventure…",
+    "Finding the best path through the city…",
+    "Lacing up the route for you…",
+    "Scouting the streets…",
+    "Mapping out your next great run…",
+]
+
+_TYPE_EMOJI = {
+    "tourism": "🗺️",
+    "historic": "🏛️",
+    "culture": "🎭",
+    "leisure": "🌳",
+    "nature": "🌿",
+    "poi": "📍",
+}
+
+
+def _distance_fun_fact(km: float) -> str:
+    if km < 6:
+        return f"That's {km / 0.4:.0f}× around a standard 400 m track. Not bad!"
+    if km < 12:
+        return f"You'll cover about {km / 1.609:.1f} miles — solid work!"
+    if km < 21:
+        return "Getting into half-marathon territory. Your legs will know it tomorrow."
+    if km < 42.2:
+        return f"That's {km / 42.195 * 100:.0f}% of a full marathon. Respect."
+    return "You're basically running a marathon. Absolute legend."
+
+
 def _distance_indicator(estimated_km: float, target_km: float) -> str:
     """Return a colored HTML badge showing estimated vs target distance."""
     if estimated_km == 0:
@@ -136,7 +166,7 @@ def main():
 
     st.set_page_config(page_title="Running Route Planner", page_icon="🏃", layout="centered")
     st.title("🏃 Running Route Planner")
-    st.caption("Generate a curated running route through the interesting parts of any city.")
+    st.caption("Generate your personalized running route through the interesting parts of any city.")
 
     # ── Step 1: search form ────────────────────────────────────────────────
     with st.form("search_form"):
@@ -152,7 +182,7 @@ def main():
             ),
             horizontal=True,
         )
-        find_pois = st.form_submit_button("Find POIs")
+        find_pois = st.form_submit_button("Find Places")
 
     if find_pois:
         if not location.strip():
@@ -164,7 +194,7 @@ def main():
             st.error(f"Missing API keys: {', '.join(missing_keys)}. Add them to .streamlit/secrets.toml.")
             return
 
-        with st.spinner("Searching for points of interest…"):
+        with st.spinner("Searching for places…"):
             try:
                 start_lat, start_lon = geocode(location)
             except ValueError:
@@ -222,10 +252,10 @@ def main():
                 break
 
     st.markdown("---")
-    st.markdown(f"### Select POIs to visit &nbsp; <small>({len(pois)} found within range)</small>",
+    st.markdown(f"### Select places to visit &nbsp; <small>({len(pois)} found within range)</small>",
                 unsafe_allow_html=True)
     st.caption(
-        "Check the POIs you want to run past, or click the dots on the map to toggle them. "
+        "Check the places you want to run past, or click the dots on the map to toggle them. "
         "Green markers are selected, grey are not. Aim for the green distance indicator."
     )
 
@@ -260,7 +290,7 @@ def main():
             st.markdown(_distance_indicator(est_km, target_km), unsafe_allow_html=True)
 
         st.markdown("")
-        col_gen, col_reset = st.columns([3, 1])
+        col_gen, col_reset = st.columns([4, 1])
         with col_gen:
             generate = st.button("Generate Route", type="primary")
         with col_reset:
@@ -302,29 +332,17 @@ def main():
         st.error(f"Missing API keys: {', '.join(missing_keys)}. Add them to .streamlit/secrets.toml.")
         return
 
-    with st.spinner("Generating your route…"):
-        if selected_pois:
-            # User chose POIs — pass them as-is, ORS will optimise the order.
-            input_pois = selected_pois
-        else:
-            # Auto mode — AI picks which POIs to include.
-            try:
-                input_pois = auto_select_waypoints(start_lat, start_lon, pois, target_km, route_type)
-            except Exception as e:
-                st.error(f"AI waypoint selection failed: {e}")
-                return
-            if not input_pois:
-                st.warning("Could not select waypoints. Try increasing the distance or switching route type.")
-                return
-
-        full_routing = [{"name": "Start", "lat": start_lat, "lon": start_lon}] + input_pois
+    with st.spinner(random.choice(_SPINNER_MSGS)):
         try:
-            route = get_route(full_routing)
+            route = plan_route(start_lat, start_lon, selected_pois, pois, target_km)
         except Exception as e:
             st.error(f"Routing failed: {e}")
             return
+        if not route:
+            st.warning("Could not generate a route. Try increasing the distance or switching route type.")
+            return
 
-        waypoints = route.get("optimised_pois") or input_pois
+        waypoints = route.get("optimised_pois") or route.get("input_pois") or selected_pois
 
         try:
             description = describe_route(waypoints, location, route_type)
@@ -341,22 +359,36 @@ def main():
             "Consider adjusting your POI selection to get closer to the target distance."
         )
     else:
+        st.balloons()
         st.success("Route generated!")
 
-    col1, col2, col3 = st.columns(3)
+    st.markdown(f"## {description['route_name']}")
+
+    pace_sec = (route["duration_min"] * 60) / actual_km
+    pace_str = f"{int(pace_sec // 60)}:{int(pace_sec % 60):02d} /km"
+    calories = int(actual_km * 60)
+
+    col1, col2, col3, col4 = st.columns(4)
     col1.metric("Distance", f"{actual_km} km")
     col2.metric("Est. time", f"{int(route['duration_min'])} min")
-    col3.metric("Waypoints", len(waypoints))
+    col3.metric("Pace", pace_str)
+    col4.metric("~Calories", f"{calories} kcal")
+    st.caption(_distance_fun_fact(actual_km))
 
     fmap = _build_map(route["coordinates"], waypoints, start_lat, start_lon)
     components.html(fmap._repr_html_(), height=420)
 
     st.markdown("### Route overview")
-    st.write(description)
+    st.write(description["overview"])
 
     st.markdown("### Waypoints")
+    notes = {wn["name"]: wn["note"] for wn in description.get("waypoint_notes", [])}
     for i, wp in enumerate(waypoints, start=1):
-        st.markdown(f"**{i}. {wp['name']}** — {wp['type']}")
+        emoji = _TYPE_EMOJI.get(wp["type"], "📍")
+        note = notes.get(wp["name"], "")
+        with st.expander(f"{emoji} **{i}. {wp['name']}** — {wp['type']}"):
+            if note:
+                st.write(note)
 
     gpx_bytes = to_gpx(route["coordinates"], waypoints, f"{route_type} run in {location}")
     st.download_button(
