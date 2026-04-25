@@ -315,11 +315,11 @@ def main():
             "<style>div[data-testid='stButton'] button { white-space: nowrap; }</style>",
             unsafe_allow_html=True,
         )
-        col_gen, col_reset = st.columns([4, 1])
+        col_gen, col_reset = st.columns([3, 1])
         with col_gen:
-            generate = st.button("Generate Route", type="primary")
+            generate = st.button("Generate Route", type="primary", use_container_width=True)
         with col_reset:
-            if st.button("Reset"):
+            if st.button("Reset", use_container_width=True):
                 for k in ("pois", "start_lat", "start_lon", "location", "distance_km", "route_type", "route",
                           "last_map_click", "pending_poi_click"):
                     st.session_state.pop(k, None)
@@ -384,20 +384,13 @@ def main():
             "Consider adjusting your POI selection to get closer to the target distance."
         )
     else:
-        st.balloons()
         st.success("Route generated!")
 
     st.markdown(f"## {description['route_name']}")
 
-    pace_sec = (route["duration_min"] * 60) / actual_km
-    pace_str = f"{int(pace_sec // 60)}:{int(pace_sec % 60):02d} /km"
-    calories = int(actual_km * 60)
-
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2 = st.columns(2)
     col1.metric("Distance", f"{actual_km} km")
-    col2.metric("Est. time", f"{int(route['duration_min'])} min")
-    col3.metric("Pace", pace_str)
-    col4.metric("~Calories", f"{calories} kcal")
+    col2.metric("Waypoints", len(waypoints))
     st.caption(_distance_fun_fact(actual_km))
 
     fmap = _build_map(route["coordinates"], waypoints, start_lat, start_lon)
