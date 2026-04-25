@@ -165,6 +165,27 @@ def main():
     _load_secrets()
 
     st.set_page_config(page_title="Running Route Planner", page_icon="🏃", layout="centered")
+    st.markdown(
+        """
+        <style>
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: var(--background-color);
+            border-top: 1px solid rgba(128,128,128,0.2);
+            text-align: center;
+            padding: 6px 0;
+            font-size: 0.8em;
+            color: gray;
+            z-index: 999;
+        }
+        </style>
+        <div class="footer">Made by Maarten Kesters</div>
+        """,
+        unsafe_allow_html=True,
+    )
     st.title("🏃 Running Route Planner")
     st.caption("Generate your personalized running route through the interesting parts of any city.")
 
@@ -290,6 +311,10 @@ def main():
             st.markdown(_distance_indicator(est_km, target_km), unsafe_allow_html=True)
 
         st.markdown("")
+        st.markdown(
+            "<style>div[data-testid='stButton'] button { white-space: nowrap; }</style>",
+            unsafe_allow_html=True,
+        )
         col_gen, col_reset = st.columns([4, 1])
         with col_gen:
             generate = st.button("Generate Route", type="primary")
@@ -401,3 +426,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
